@@ -10,6 +10,9 @@ WORKDIR /app
 # Copy the application code
 COPY . .
 
+# Set environment variable for templates
+ENV PPT_TEMPLATE_PATH='/app/templates'
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
