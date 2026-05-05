@@ -273,6 +273,18 @@ manage_text(slide_index=0, operation="add", text="Hello World", font_size=24)
 # Format existing text
 manage_text(slide_index=0, operation="format", shape_index=0, bold=True, color=[255,0,0])
 
+# Update existing text (formatting only applied if fields are provided)
+manage_text(
+    slide_index=0,
+    operation="update",
+    shape_index=0,
+    text="Updated Title",
+    font_name="Segoe UI",
+    font_size=28,
+    bold=True,
+    alignment="center"
+)
+
 # Validate text fit with auto-fix
 manage_text(slide_index=0, operation="validate", shape_index=0, validation_only=False)
 ```

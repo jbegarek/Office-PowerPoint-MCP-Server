@@ -248,9 +248,18 @@ def format_text_advanced(text_frame, font_size: int = None, font_name: str = Non
             'right': PP_ALIGN.RIGHT,
             'justify': PP_ALIGN.JUSTIFY
         }
+
+        vertical_alignment_map = {
+            'top': MSO_VERTICAL_ANCHOR.TOP,
+            'middle': MSO_VERTICAL_ANCHOR.MIDDLE,
+            'bottom': MSO_VERTICAL_ANCHOR.BOTTOM
+        }
         
         # Enable text wrapping
         text_frame.word_wrap = True
+
+        if vertical_alignment and vertical_alignment in vertical_alignment_map:
+            text_frame.vertical_anchor = vertical_alignment_map[vertical_alignment]
         
         # Apply formatting to all paragraphs and runs
         for paragraph in text_frame.paragraphs:
@@ -273,6 +282,12 @@ def format_text_advanced(text_frame, font_size: int = None, font_name: str = Non
                 if color is not None:
                     r, g, b = color
                     font.color.rgb = RGBColor(r, g, b)
+                if bg_color is not None:
+                    try:
+                        r, g, b = bg_color
+                        font.highlight_color.rgb = RGBColor(r, g, b)
+                    except Exception:
+                        pass
         
         return result
         
@@ -515,6 +530,13 @@ def _safe_get_highlight_color(font) -> Optional[List[int]]:
         highlight = font.highlight_color
     except Exception:
         return None
+    if highlight is None:
+        return None
+
+    try:
+        return _rgb_to_list(highlight.rgb)
+    except Exception:
+        return None
 
 
 def _is_placeholder(shape) -> bool:
@@ -523,14 +545,6 @@ def _is_placeholder(shape) -> bool:
         return True
     except Exception:
         return False
-
-    if highlight is None:
-        return None
-
-    try:
-        return _rgb_to_list(highlight.rgb)
-    except Exception:
-        return None
 
 
 def _extract_text_frame_formatting(text_frame) -> Dict:
