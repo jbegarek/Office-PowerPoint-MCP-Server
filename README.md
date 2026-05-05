@@ -708,6 +708,29 @@ result = use_mcp_tool(
                 "shape_index": 1,
                 "shape_name": "Subtitle Placeholder 2",
                 "text": "Q4 2024 Results",
+                "formatting": {
+                    "word_wrap": true,
+                    "vertical_alignment": "middle",
+                    "paragraphs": [
+                        {
+                            "index": 0,
+                            "alignment": "center",
+                            "runs": [
+                                {
+                                    "index": 0,
+                                    "text": "Q4 2024 Results",
+                                    "font_name": "Segoe UI",
+                                    "font_size": 24,
+                                    "bold": true,
+                                    "italic": null,
+                                    "underline": null,
+                                    "color": [0, 0, 0],
+                                    "bg_color": null
+                                }
+                            ]
+                        }
+                    ]
+                },
                 "placeholder_type": "SUBTITLE",
                 "placeholder_idx": 1
             }
@@ -716,10 +739,34 @@ result = use_mcp_tool(
             {
                 "shape_index": 3,
                 "shape_name": "TextBox 4",
-                "text": "Revenue increased by 15%"
+                "text": "Revenue increased by 15%",
+                "formatting": {
+                    "word_wrap": true,
+                    "vertical_alignment": "top",
+                    "paragraphs": [
+                        {
+                            "index": 0,
+                            "alignment": "left",
+                            "runs": [
+                                {
+                                    "index": 0,
+                                    "text": "Revenue increased by 15%",
+                                    "font_name": "Segoe UI",
+                                    "font_size": 18,
+                                    "bold": null,
+                                    "italic": null,
+                                    "underline": null,
+                                    "color": [34, 34, 34],
+                                    "bg_color": null
+                                }
+                            ]
+                        }
+                    ]
+                }
             }
         ],
         "table_text": [],
+        "table_cells": [],
         "all_text_combined": "Quarterly Business Review\nQ4 2024 Results\nRevenue increased by 15%"
     },
     "total_text_shapes": 2,
@@ -977,6 +1024,7 @@ Office-PowerPoint-MCP-Server/
 ### **Key Features of Text Extraction:**
 - **Complete text coverage** - Extracts from titles, placeholders, text boxes, and table cells
 - **Structured output** - Organized by content type (titles, placeholders, shapes, tables)
+- **Formatting details** - Exposes per-paragraph alignment and per-run font properties
 - **Presentation-wide analysis** - Statistics on text distribution across slides
 - **Flexible output options** - Individual slide content or combined presentation text
 - **Error handling** - Graceful handling of slides that cannot be processed

@@ -5,7 +5,7 @@ Functions for slides, text, images, tables, charts, and shapes.
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from typing import Dict, List, Tuple, Optional, Any
@@ -473,6 +473,125 @@ def format_chart(chart, has_legend: bool = True, legend_position: str = 'right',
         pass  # Graceful degradation for chart formatting
 
 
+def _alignment_to_string(alignment) -> Optional[str]:
+    if alignment is None:
+        return None
+
+    alignment_map = {
+        PP_ALIGN.LEFT: 'left',
+        PP_ALIGN.CENTER: 'center',
+        PP_ALIGN.RIGHT: 'right',
+        PP_ALIGN.JUSTIFY: 'justify'
+    }
+
+    return alignment_map.get(alignment, str(alignment))
+
+
+def _vertical_anchor_to_string(anchor) -> Optional[str]:
+    if anchor is None:
+        return None
+
+    anchor_map = {
+        MSO_VERTICAL_ANCHOR.TOP: 'top',
+        MSO_VERTICAL_ANCHOR.MIDDLE: 'middle',
+        MSO_VERTICAL_ANCHOR.BOTTOM: 'bottom'
+    }
+
+    return anchor_map.get(anchor, str(anchor))
+
+
+def _rgb_to_list(rgb) -> Optional[List[int]]:
+    if rgb is None:
+        return None
+
+    try:
+        return [int(rgb[0]), int(rgb[1]), int(rgb[2])]
+    except Exception:
+        return None
+
+
+def _safe_get_highlight_color(font) -> Optional[List[int]]:
+    try:
+        highlight = font.highlight_color
+    except Exception:
+        return None
+
+
+def _is_placeholder(shape) -> bool:
+    try:
+        _ = shape.placeholder_format
+        return True
+    except Exception:
+        return False
+
+    if highlight is None:
+        return None
+
+    try:
+        return _rgb_to_list(highlight.rgb)
+    except Exception:
+        return None
+
+
+def _extract_text_frame_formatting(text_frame) -> Dict:
+    formatting = {
+        "word_wrap": getattr(text_frame, 'word_wrap', None),
+        "vertical_alignment": _vertical_anchor_to_string(getattr(text_frame, 'vertical_anchor', None)),
+        "paragraphs": []
+    }
+
+    try:
+        paragraphs = list(text_frame.paragraphs)
+    except Exception:
+        return formatting
+
+    for paragraph_index, paragraph in enumerate(paragraphs):
+        paragraph_info = {
+            "index": paragraph_index,
+            "alignment": _alignment_to_string(getattr(paragraph, 'alignment', None)),
+            "runs": []
+        }
+
+        try:
+            runs = list(paragraph.runs)
+        except Exception:
+            runs = []
+
+        for run_index, run in enumerate(runs):
+            font = getattr(run, 'font', None)
+            font_size = None
+            if font is not None and getattr(font, 'size', None) is not None:
+                try:
+                    font_size = int(font.size.pt)
+                except Exception:
+                    font_size = None
+
+            color = None
+            if font is not None and getattr(font, 'color', None) is not None:
+                try:
+                    color = _rgb_to_list(font.color.rgb)
+                except Exception:
+                    color = None
+
+            bg_color = _safe_get_highlight_color(font) if font is not None else None
+
+            paragraph_info["runs"].append({
+                "index": run_index,
+                "text": getattr(run, 'text', ''),
+                "font_name": font.name if font is not None else None,
+                "font_size": font_size,
+                "bold": font.bold if font is not None else None,
+                "italic": font.italic if font is not None else None,
+                "underline": font.underline if font is not None else None,
+                "color": color,
+                "bg_color": bg_color
+            })
+
+        formatting["paragraphs"].append(paragraph_info)
+
+    return formatting
+
+
 def extract_slide_text_content(slide) -> Dict:
     """
     Extract all text content from a slide including placeholders and text shapes.
@@ -489,6 +608,7 @@ def extract_slide_text_content(slide) -> Dict:
             "placeholders": [],
             "text_shapes": [],
             "table_text": [],
+            "table_cells": [],
             "all_text_combined": ""
         }
         
@@ -518,11 +638,12 @@ def extract_slide_text_content(slide) -> Dict:
                 if hasattr(shape, 'text_frame') and shape.text_frame:
                     text = shape.text_frame.text.strip()
                     if text:
+                        shape_text_info["formatting"] = _extract_text_frame_formatting(shape.text_frame)
                         shape_text_info["text"] = text
                         all_texts.append(text)
                         
                         # Categorize by shape type
-                        if hasattr(shape, 'placeholder_format'):
+                        if _is_placeholder(shape):
                             # This is a placeholder
                             placeholder_info = shape_text_info.copy()
                             placeholder_info["placeholder_type"] = str(shape.placeholder_format.type)
@@ -535,6 +656,7 @@ def extract_slide_text_content(slide) -> Dict:
                 # Extract text from tables
                 elif hasattr(shape, 'table'):
                     table_texts = []
+                    table_cell_details = []
                     table = shape.table
                     for row_idx, row in enumerate(table.rows):
                         row_texts = []
@@ -543,6 +665,12 @@ def extract_slide_text_content(slide) -> Dict:
                             if cell_text:
                                 row_texts.append(cell_text)
                                 all_texts.append(cell_text)
+                                table_cell_details.append({
+                                    "row": row_idx,
+                                    "col": col_idx,
+                                    "text": cell_text,
+                                    "formatting": _extract_text_frame_formatting(cell.text_frame)
+                                })
                         if row_texts:
                             table_texts.append({
                                 "row": row_idx,
@@ -554,6 +682,13 @@ def extract_slide_text_content(slide) -> Dict:
                             "shape_index": i,
                             "shape_name": shape.name,
                             "table_content": table_texts
+                        })
+
+                    if table_cell_details:
+                        text_content["table_cells"].append({
+                            "shape_index": i,
+                            "shape_name": shape.name,
+                            "cells": table_cell_details
                         })
                         
             except Exception as e:
