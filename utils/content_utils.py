@@ -42,6 +42,8 @@ def get_slide_info(slide, slide_index: int) -> Dict:
         Dictionary containing slide information
     """
     try:
+        from pptx.util import Inches, Emu
+
         placeholders = []
         for placeholder in slide.placeholders:
             placeholder_info = {
@@ -53,20 +55,51 @@ def get_slide_info(slide, slide_index: int) -> Dict:
         
         shapes = []
         for i, shape in enumerate(slide.shapes):
+            left_emu = shape.left
+            top_emu = shape.top
+            width_emu = shape.width
+            height_emu = shape.height
+
+            left_in = float(Inches(1).emu / left_emu) if left_emu else 0
+            top_in = float(Inches(1).emu / top_emu) if top_emu else 0
+            width_in = float(width_emu) / Inches(1).emu if width_emu else 0
+            height_in = float(height_emu) / Inches(1).emu if height_emu else 0
+
             shape_info = {
                 "index": i,
                 "name": shape.name,
                 "shape_type": str(shape.shape_type),
-                "left": shape.left,
-                "top": shape.top,
-                "width": shape.width,
-                "height": shape.height
+                "left": left_emu,
+                "top": top_emu,
+                "width": width_emu,
+                "height": height_emu,
+                "left_inches": round(left_in, 2),
+                "top_inches": round(top_in, 2),
+                "width_inches": round(width_in, 2),
+                "height_inches": round(height_in, 2),
+                "has_text": bool(hasattr(shape, 'text_frame') and shape.text_frame and shape.text_frame.text.strip()),
             }
             shapes.append(shape_info)
         
+        # Slide dimensions in inches (from presentation)
+        try:
+            pres = slide.part.package.presentation_part.presentation
+            slide_width_emu = pres.slide_width
+            slide_height_emu = pres.slide_height
+        except Exception:
+            slide_width_emu = None
+            slide_height_emu = None
+            
+        slide_width_in = float(slide_width_emu) / Inches(1).emu if slide_width_emu else 0
+        slide_height_in = float(slide_height_emu) / Inches(1).emu if slide_height_emu else 0
+
         return {
             "slide_index": slide_index,
             "layout_name": slide.slide_layout.name,
+            "slide_width": slide_width_emu,
+            "slide_height": slide_height_emu,
+            "slide_width_inches": round(slide_width_in, 2),
+            "slide_height_inches": round(slide_height_in, 2),
             "placeholder_count": len(placeholders),
             "placeholders": placeholders,
             "shape_count": len(shapes),
