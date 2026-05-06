@@ -22,9 +22,7 @@ A comprehensive MCP (Model Context Protocol) server for PowerPoint manipulation 
 
 <img width="1640" alt="084f1cf4bc7e4fcd4890c8f94f536c1" src="https://github.com/user-attachments/assets/420e63a0-15a4-46d8-b149-1408d23af038" />
 
-#### Demo's GIF -> (./public/demo.mp4)
 
-![demo](./public/demo.gif)
 
 ## Features
 

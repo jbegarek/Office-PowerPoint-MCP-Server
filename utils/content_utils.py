@@ -766,12 +766,98 @@ def extract_slide_text_content(slide) -> Dict:
 # Table Row/Column Manipulation
 # ============================================================
 
+def _safe_cell_formatting(cell) -> Dict:
+    """
+    Safely capture the current formatting of a table cell.
+
+    Returns a dict with all preserved formatting values, or None for unset.
+    """
+    fmt = {}
+    tf = cell.text_frame
+
+    # Paragraph alignment
+    p = tf.paragraphs[0] if tf.paragraphs else None
+    fmt["alignment"] = p.alignment if p else None
+
+    # Run-level font properties (from the first run)
+    run = p.runs[0] if (p and p.runs) else None
+    if run:
+        font = run.font
+        fmt["bold"] = font.bold
+        fmt["italic"] = font.italic
+        fmt["underline"] = font.underline
+        fmt["font_size"] = font.size
+        fmt["font_name"] = font.name
+        fmt["font_color"] = font.color.rgb if font.color.type is not None else None
+    else:
+        fmt["bold"] = None
+        fmt["italic"] = None
+        fmt["underline"] = None
+        fmt["font_size"] = None
+        fmt["font_name"] = None
+        fmt["font_color"] = None
+
+    # Vertical alignment
+    fmt["vertical_alignment"] = getattr(tf, "vertical_anchor", None)
+
+    # Background fill
+    fmt["bg_color"] = cell.fill.fore_color.rgb if cell.fill.type is not None else None
+
+    return fmt
+
+
+def _apply_cell_formatting(cell, fmt: Dict) -> None:
+    """
+    Apply a saved formatting dict back to a table cell.
+    Only re-applies values that are not None.
+
+    Works directly on the cell XML rather than going through format_table_cell,
+    because format_table_cell expects int-point sizes and tuple-RGB colors,
+    while font.size returns Centipoints and font.color.rgb returns RGBColor.
+    """
+    p = cell.text_frame.paragraphs[0] if cell.text_frame.paragraphs else None
+    if p is None:
+        return
+
+    # Re-apply paragraph alignment
+    if fmt.get("alignment") is not None:
+        p.alignment = fmt["alignment"]
+
+    # Re-apply run-level formatting
+    for run in p.runs:
+        font = run.font
+
+        if fmt.get("font_size") is not None:
+            font.size = fmt["font_size"]  # Centipoints object, assign directly
+        if fmt.get("font_name") is not None:
+            font.name = fmt["font_name"]
+        if fmt.get("bold") is not None:
+            font.bold = fmt["bold"]
+        if fmt.get("italic") is not None:
+            font.italic = fmt["italic"]
+        if fmt.get("underline") is not None:
+            font.underline = fmt["underline"]
+        if fmt.get("font_color") is not None:
+            font.color.rgb = fmt["font_color"]  # RGBColor object
+
+    # Background fill
+    if fmt.get("bg_color") is not None:
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = fmt["bg_color"]
+
+    # Vertical alignment
+    if fmt.get("vertical_alignment") is not None:
+        cell.text_frame.vertical_anchor = fmt["vertical_alignment"]
+
+
 def edit_cell_text(cell, text: str = None, font_size: int = None, font_name: str = None,
                    bold: bool = None, italic: bool = None,
                    color: Tuple[int, int, int] = None, bg_color: Tuple[int, int, int] = None,
                    alignment: str = None, vertical_alignment: str = None) -> None:
     """
-    Edit a table cell's text and optionally apply formatting.
+    Edit a table cell's text while preserving its existing formatting.
+
+    Only the explicitly provided formatting parameters override the existing ones.
 
     Args:
         cell: The table cell object
@@ -786,8 +872,12 @@ def edit_cell_text(cell, text: str = None, font_size: int = None, font_name: str
         vertical_alignment: Vertical alignment
     """
     if text is not None:
+        # Preserve current formatting before replacing text
+        saved_fmt = _safe_cell_formatting(cell)
         cell.text = str(text)
+        _apply_cell_formatting(cell, saved_fmt)
 
+    # Now apply any user-provided formatting overrides
     format_table_cell(
         cell,
         font_size=font_size,
