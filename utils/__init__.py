@@ -36,6 +36,11 @@ __all__ = [
     "add_image",
     "add_table",
     "format_table_cell",
+    "edit_cell_text",
+    "add_table_row",
+    "delete_table_row",
+    "add_table_column",
+    "delete_table_column",
     "add_chart",
     "format_chart",
     

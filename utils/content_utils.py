@@ -6,7 +6,8 @@ from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
-from pptx.util import Inches, Pt
+from pptx.oxml.ns import qn
+from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from typing import Dict, List, Tuple, Optional, Any
 import tempfile
@@ -759,3 +760,205 @@ def extract_slide_text_content(slide) -> Dict:
             "error": f"Failed to extract text content: {str(e)}",
             "text_content": None
         }
+
+
+# ============================================================
+# Table Row/Column Manipulation
+# ============================================================
+
+def edit_cell_text(cell, text: str = None, font_size: int = None, font_name: str = None,
+                   bold: bool = None, italic: bool = None,
+                   color: Tuple[int, int, int] = None, bg_color: Tuple[int, int, int] = None,
+                   alignment: str = None, vertical_alignment: str = None) -> None:
+    """
+    Edit a table cell's text and optionally apply formatting.
+
+    Args:
+        cell: The table cell object
+        text: New text content for the cell (None to keep existing)
+        font_size: Font size in points
+        font_name: Font name
+        bold: Whether text should be bold
+        italic: Whether text should be italic
+        color: RGB color tuple (r, g, b)
+        bg_color: Background RGB color tuple (r, g, b)
+        alignment: Text alignment
+        vertical_alignment: Vertical alignment
+    """
+    if text is not None:
+        cell.text = str(text)
+
+    format_table_cell(
+        cell,
+        font_size=font_size,
+        font_name=font_name,
+        bold=bold,
+        italic=italic,
+        color=color,
+        bg_color=bg_color,
+        alignment=alignment,
+        vertical_alignment=vertical_alignment
+    )
+
+
+def _create_tc(parent_tbl, default_height_emu: int = 400000) -> Any:
+    """Create a new table cell XML element with an empty paragraph."""
+    tc = parent_tbl.makeelement(qn('a:tc'), {})
+    tc_pr = tc.makeelement(qn('a:tcPr'), {})
+    tc.append(tc_pr)
+    p = tc.makeelement(qn('a:p'), {})
+    r = p.makeelement(qn('a:r'), {})
+    rPr = r.makeelement(qn('a:rPr'), {})
+    r.append(rPr)
+    p.append(r)
+    tc.append(p)
+    return tc
+
+
+def _create_grid_col(default_width: str = "914400") -> Any:
+    """Create a new gridCol XML element."""
+    return _create_grid_col_with_width(int(default_width))
+
+
+def _create_grid_col_with_width(width_emu: int) -> Any:
+    """Create a new gridCol XML element with specified width."""
+    gc = _create_tc(None).makeelement(qn('a:gridCol'), {'w': str(width_emu)})
+    return gc
+
+
+def add_table_row(table, insert_at: int = None, data: Optional[List[str]] = None,
+                  height: Optional[float] = None) -> int:
+    """
+    Add a new row to a table.
+
+    Args:
+        table: The table object
+        insert_at: Row index to insert at (None = append at end)
+        data: Optional list of text values for the new row cells
+        height: Optional row height in inches (None = default)
+
+    Returns:
+        The index of the newly added row
+    """
+    tbl = table._tbl
+    num_cols = len(table.columns)
+    default_height_emu = int(height * 914400) if height else 400000
+
+    # Create new <a:tr> element
+    new_tr = tbl.makeelement(qn('a:tr'), {'h': str(default_height_emu)})
+
+    # Add cells matching the grid columns
+    for i in range(num_cols):
+        tc = _create_tc(tbl)
+        new_tr.append(tc)
+
+    # Insert at position or append
+    if insert_at is not None and insert_at < len(tbl.tr_lst):
+        existing_tr = tbl.tr_lst[insert_at]
+        tbl.insert(list(tbl.tr_lst).index(existing_tr), new_tr)
+        row_index = insert_at
+    else:
+        tbl.append(new_tr)
+        row_index = len(tbl.tr_lst) - 1
+
+    table.notify_height_changed()
+
+    # Populate data if provided
+    if data:
+        for i, value in enumerate(data):
+            if i < num_cols:
+                table.cell(row_index, i).text = str(value)
+
+    return row_index
+
+
+def delete_table_row(table, row_index: int) -> None:
+    """
+    Delete a row from a table by index.
+
+    Args:
+        table: The table object
+        row_index: Index of the row to delete
+    """
+    tbl = table._tbl
+    if row_index < 0 or row_index >= len(tbl.tr_lst):
+        raise ValueError(f"Invalid row index: {row_index}. Available rows: 0-{len(tbl.tr_lst) - 1}")
+
+    tr_to_remove = tbl.tr_lst[row_index]
+    tbl.remove(tr_to_remove)
+    table.notify_height_changed()
+
+
+def add_table_column(table, insert_at: int = None, data: Optional[List[str]] = None,
+                     width: Optional[float] = None) -> int:
+    """
+    Add a new column to a table.
+
+    Args:
+        table: The table object
+        insert_at: Column index to insert at (None = append at end)
+        data: Optional list of text values for the new column cells (one per row)
+        width: Optional column width in inches (None = auto)
+
+    Returns:
+        The index of the newly added column
+    """
+    tbl = table._tbl
+    num_rows = len(tbl.tr_lst)
+    default_width_emu = int(width * 914400) if width else 914400
+
+    # Create new <a:gridCol> element
+    new_gc = tbl.tblGrid.makeelement(qn('a:gridCol'), {'w': str(default_width_emu)})
+
+    # Insert at position or append
+    if insert_at is not None and insert_at < len(tbl.tblGrid.gridCol_lst):
+        existing_gc = list(tbl.tblGrid.gridCol_lst)[insert_at]
+        tbl.tblGrid.insert(list(tbl.tblGrid.gridCol_lst).index(existing_gc), new_gc)
+        col_index = insert_at
+    else:
+        tbl.tblGrid.append(new_gc)
+        col_index = len(list(tbl.tblGrid.gridCol_lst)) - 1
+
+    # Add a new <a:tc> to each existing row
+    for tr in tbl.tr_lst:
+        tc = _create_tc(tr)
+        if insert_at is not None and insert_at < len(tr.findall(qn('a:tc'))):
+            existing_tcs = tr.findall(qn('a:tc'))
+            tr.insert(list(existing_tcs).index(existing_tcs[insert_at]), tc)
+        else:
+            tr.append(tc)
+
+    table.notify_width_changed()
+
+    # Populate data if provided
+    if data:
+        for i, value in enumerate(data):
+            if i < num_rows:
+                table.cell(i, col_index).text = str(value)
+
+    return col_index
+
+
+def delete_table_column(table, col_index: int) -> None:
+    """
+    Delete a column from a table by index.
+
+    Args:
+        table: The table object
+        col_index: Index of the column to delete
+    """
+    tbl = table._tbl
+    grid_cols = list(tbl.tblGrid.gridCol_lst)
+    if col_index < 0 or col_index >= len(grid_cols):
+        raise ValueError(f"Invalid column index: {col_index}. Available columns: 0-{len(grid_cols) - 1}")
+
+    # Remove gridCol
+    tbl.tblGrid.remove(grid_cols[col_index])
+
+    # Remove corresponding tc from each row
+    for tr in tbl.tr_lst:
+        tcs = tr.findall(qn('a:tc'))
+        if col_index < len(tcs):
+            tr.remove(tcs[col_index])
+
+    table.notify_width_changed()

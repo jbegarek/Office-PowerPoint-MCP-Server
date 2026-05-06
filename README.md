@@ -248,8 +248,13 @@ The server provides **34 specialized tools** organized into the following catego
 ### **Structural Elements (4 tools)**
 23. **add_table** - Create tables with enhanced formatting
 24. **format_table_cell** - Format individual table cells
-25. **add_shape** - Add shapes with text and formatting options
-26. **add_chart** - Create charts with comprehensive customization
+25. **edit_table_cell** - Edit the text and formatting of a specific table cell
+26. **add_table_row** - Add a new row to an existing table (at any position)
+27. **delete_table_row** - Delete a row from an existing table
+28. **add_table_column** - Add a new column to an existing table (at any position)
+29. **delete_table_column** - Delete a column from an existing table
+30. **add_shape** - Add shapes with text and formatting options
+31. **add_chart** - Create charts with comprehensive customization
 
 ### **Professional Design (3 tools)**
 27. **apply_professional_design** - ✨ **Unified design tool** (themes/slides/enhancement)
@@ -955,7 +960,7 @@ Templates automatically adjust to content:
 Office-PowerPoint-MCP-Server/
 ├── ppt_mcp_server.py          # Main consolidated server (v2.0)
 ├── slide_layout_templates.json # 25+ professional slide templates with dynamic features
-├── tools/                     # 11 specialized tool modules (32 tools total)
+├── tools/                     # 11 specialized tool modules (37 tools total)
 │   ├── __init__.py
 │   ├── presentation_tools.py  # Presentation management (7 tools)
 │   ├── content_tools.py       # Content & slides (6 tools)

@@ -367,14 +367,14 @@ def get_server_info() -> Dict:
     return {
         "name": "PowerPoint MCP Server - Enhanced Edition",
         "version": "2.1.0",
-        "total_tools": 32,  # Organized into 11 specialized modules
+        "total_tools": 37,  # Organized into 11 specialized modules
         "loaded_presentations": len(presentations),
         "current_presentation": current_presentation_id,
         "features": [
             "Presentation Management (7 tools)",
             "Content Management (6 tools)", 
             "Template Operations (7 tools)",
-            "Structural Elements (4 tools)",
+            "Structural Elements (9 tools)",
             "Professional Design (3 tools)",
             "Specialized Features (5 tools)"
         ],
