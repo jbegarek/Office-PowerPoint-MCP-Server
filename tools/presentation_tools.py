@@ -50,7 +50,7 @@ def register_presentation_tools(
         ),
     )
     def create_presentation_from_template(template_path: str, id: Optional[str] = None) -> Dict:
-        """Create a new PowerPoint presentation from a template file."""
+        """Create a presentation from a .pptx template file that exists on the server. The template_path must be a server-side path configured via PPT_TEMPLATE_PATH — users cannot upload template files. For building presentations without a server-side template, use create_presentation instead."""
         # Check if template file exists
         if not os.path.exists(template_path):
             # Try to find the template by searching in configured directories
@@ -98,7 +98,7 @@ def register_presentation_tools(
         ),
     )
     def open_presentation(file_path: str, id: Optional[str] = None) -> Dict:
-        """Open an existing PowerPoint presentation from a file."""
+        """Open a .pptx file that already exists on the server. file_path must be a server-side path — users cannot upload files. To start fresh, use create_presentation instead."""
         # Check if file exists
         if not os.path.exists(file_path):
             return {
@@ -133,7 +133,7 @@ def register_presentation_tools(
         ),
     )
     def save_presentation(file_path: str, presentation_id: Optional[str] = None) -> Dict:
-        """Save a presentation to a file."""
+        """Save the presentation to disk and return a download_url. Always call this as the final step before presenting any result to the user, then include the download_url in your response."""
         # Use the specified presentation or the current one
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
 
@@ -210,7 +210,7 @@ def register_presentation_tools(
         ),
     )
     def get_template_file_info(template_path: str) -> Dict:
-        """Get information about a template file including layouts and properties."""
+        """Get information about a .pptx template file on the server: its layouts and properties. template_path must be a server-side path — users cannot upload template files."""
         # Check if template file exists
         if not os.path.exists(template_path):
             # Try to find the template by searching in configured directories
@@ -247,7 +247,7 @@ def register_presentation_tools(
         comments: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Set core document properties."""
+        """Set metadata properties on the presentation: title, subject, author, keywords, comments."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:

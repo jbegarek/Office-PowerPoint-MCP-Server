@@ -24,21 +24,7 @@ def register_hyperlink_tools(app, presentations, get_current_presentation_id, va
         run_index: int = 0,
         presentation_id: str = None
     ) -> Dict:
-        """
-        Manage hyperlinks in text shapes and runs.
-        
-        Args:
-            operation: Operation type ("add", "remove", "list", "update")
-            slide_index: Index of the slide (0-based)
-            shape_index: Index of the shape on the slide (0-based)
-            text: Text to make into hyperlink (for "add" operation)
-            url: URL for the hyperlink
-            run_index: Index of text run within the shape (0-based)
-            presentation_id: Optional presentation ID (uses current if not provided)
-            
-        Returns:
-            Dictionary with operation results
-        """
+        """Add, remove, update, or list hyperlinks in a text shape. operation: "add" creates a hyperlink on text at run_index; "remove" removes it; "update" changes the URL; "list" returns all hyperlinks in the shape. All indices are 0-based."""
         try:
             # Get presentation
             pres_id = presentation_id or get_current_presentation_id()

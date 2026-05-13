@@ -29,23 +29,7 @@ def register_connector_tools(app, presentations, get_current_presentation_id, va
         color: List[int] = None,
         presentation_id: str = None
     ) -> Dict:
-        """
-        Add connector lines/arrows between points on a slide.
-        
-        Args:
-            slide_index: Index of the slide (0-based)
-            connector_type: Type of connector ("straight", "elbow", "curved")
-            start_x: Starting X coordinate in inches
-            start_y: Starting Y coordinate in inches
-            end_x: Ending X coordinate in inches  
-            end_y: Ending Y coordinate in inches
-            line_width: Width of the connector line in points
-            color: RGB color as [r, g, b] list
-            presentation_id: Optional presentation ID (uses current if not provided)
-            
-        Returns:
-            Dictionary with operation results
-        """
+        """Add a connector line or arrow between two points on a slide. connector_type: "straight", "elbow", or "curved". Coordinates (start_x, start_y, end_x, end_y) are in inches. line_width is in points. color is [R,G,B]."""
         try:
             # Get presentation
             pres_id = presentation_id or get_current_presentation_id()

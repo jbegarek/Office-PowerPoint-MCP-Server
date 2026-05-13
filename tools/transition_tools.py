@@ -22,19 +22,7 @@ def register_transition_tools(app, presentations, get_current_presentation_id, v
         duration: float = 1.0,
         presentation_id: str = None
     ) -> Dict:
-        """
-        Manage slide transitions and timing.
-        
-        Args:
-            slide_index: Index of the slide (0-based)
-            operation: Operation type ("set", "remove", "get")
-            transition_type: Type of transition (basic support)
-            duration: Duration of transition in seconds
-            presentation_id: Optional presentation ID (uses current if not provided)
-            
-        Returns:
-            Dictionary with transition information
-        """
+        """Set, remove, or get slide transition settings. operation: "set", "remove", or "get". Note: python-pptx has limited transition support — only basic transitions can be set. slide_index is 0-based."""
         try:
             # Get presentation
             pres_id = presentation_id or get_current_presentation_id()

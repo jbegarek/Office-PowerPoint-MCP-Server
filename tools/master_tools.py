@@ -21,18 +21,7 @@ def register_master_tools(app, presentations, get_current_presentation_id, valid
         layout_index: int = None,
         presentation_id: str = None
     ) -> Dict:
-        """
-        Access and manage slide master properties and layouts.
-        
-        Args:
-            operation: Operation type ("list", "get_layouts", "get_info")
-            master_index: Index of the slide master (0-based)
-            layout_index: Index of specific layout within master (0-based)
-            presentation_id: Optional presentation ID (uses current if not provided)
-            
-        Returns:
-            Dictionary with slide master information
-        """
+        """Inspect slide masters and layouts. operation: "list" returns all masters; "get_layouts" returns layouts for a master; "get_info" returns details of a specific layout including its placeholders. All indices are 0-based."""
         try:
             # Get presentation
             pres_id = presentation_id or get_current_presentation_id()

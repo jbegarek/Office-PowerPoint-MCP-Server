@@ -48,18 +48,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         image_paths: Optional[Dict[str, str]] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """
-        Apply a structured layout template to an existing slide.
-        This modifies slide layout and content structure using predefined templates.
-        
-        Args:
-            slide_index: Index of the slide to apply template to
-            template_id: ID of the template to apply (e.g., 'title_slide', 'text_with_image')
-            color_scheme: Color scheme to use ('modern_blue', 'corporate_gray', 'elegant_green', 'warm_red')
-            content_mapping: Dictionary mapping element roles to custom content
-            image_paths: Dictionary mapping image element roles to file paths
-            presentation_id: Presentation ID (uses current if None)
-        """
+        """Apply a built-in layout template to an existing slide. Use when you have already created a slide and want to restyle it. For creating a new slide with a template, prefer create_slide_from_template. Call list_slide_templates to see valid template_id values. image_paths is not supported — file uploads are not available."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -111,17 +100,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         layout_index: int = 1,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """
-        Create a new slide using a layout template.
-        
-        Args:
-            template_id: ID of the template to use (e.g., 'title_slide', 'text_with_image')
-            color_scheme: Color scheme to use ('modern_blue', 'corporate_gray', 'elegant_green', 'warm_red')
-            content_mapping: Dictionary mapping element roles to custom content
-            image_paths: Dictionary mapping image element roles to file paths
-            layout_index: PowerPoint layout index to use as base (default: 1)
-            presentation_id: Presentation ID (uses current if None)
-        """
+        """PREFERRED: Create a new slide using a built-in layout template. Call list_slide_templates first to see valid template_id values. content_mapping maps element roles (e.g. "title", "content") to text. image_paths is not supported — file uploads are not available."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -176,40 +155,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         presentation_title: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """
-        Create a complete presentation from a sequence of templates.
-        
-        Args:
-            template_sequence: List of template configurations, each containing:
-                - template_id: Template to use
-                - content: Content mapping for the template
-                - images: Image path mapping for the template
-            color_scheme: Color scheme to apply to all slides
-            presentation_title: Optional title for the presentation
-            presentation_id: Presentation ID (uses current if None)
-        
-        Example template_sequence:
-        [
-            {
-                "template_id": "title_slide",
-                "content": {
-                    "title": "My Presentation",
-                    "subtitle": "Annual Report 2024",
-                    "author": "John Doe"
-                }
-            },
-            {
-                "template_id": "text_with_image",
-                "content": {
-                    "title": "Key Results",
-                    "content": "• Achievement 1\\n• Achievement 2"
-                },
-                "images": {
-                    "supporting": "/path/to/image.jpg"
-                }
-            }
-        ]
-        """
+        """Create a full presentation from a sequence of template slides in one call. template_sequence is a list of objects, each with "template_id" and "content" keys (content maps role names like "title" / "content" to text). Call list_slide_templates first to see valid template IDs. image_paths inside templates are not supported — file uploads are not available."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -261,12 +207,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         ),
     )
     def get_template_info(template_id: str) -> Dict:
-        """
-        Get detailed information about a specific template.
-        
-        Args:
-            template_id: ID of the template to get information about
-        """
+        """Get detailed information about a specific template: its elements, available color schemes, and usage tip. Use list_slide_templates first to find valid template_id values."""
         try:
             templates_data = template_utils.load_slide_templates()
             
@@ -309,11 +250,12 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
                 "error": f"Failed to get template info: {str(e)}"
             }
     
-    @app.tool(
-        annotations=ToolAnnotations(
-            title="Auto Generate Presentation",
-        ),
-    )
+    # auto_generate_presentation is disabled
+    # @app.tool(
+    #     annotations=ToolAnnotations(
+    #         title="Auto Generate Presentation",
+    #     ),
+    # )
     def auto_generate_presentation(
         topic: str,
         slide_count: int = 5,
@@ -441,18 +383,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         max_font_size: int = 36,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """
-        Optimize text elements on a slide for better readability and fit.
-        
-        Args:
-            slide_index: Index of the slide to optimize
-            auto_resize: Whether to automatically resize fonts to fit containers
-            auto_wrap: Whether to apply intelligent text wrapping
-            optimize_spacing: Whether to optimize line spacing
-            min_font_size: Minimum allowed font size
-            max_font_size: Maximum allowed font size
-            presentation_id: Presentation ID (uses current if None)
-        """
+        """Automatically resize fonts, wrap text, and adjust spacing on a slide so text fits its containers. slide_index is 0-based. font sizes are clamped between min_font_size and max_font_size (defaults: 8–36pt)."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:

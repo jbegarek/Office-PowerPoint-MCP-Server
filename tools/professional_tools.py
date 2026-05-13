@@ -30,8 +30,7 @@ def register_professional_tools(app: FastMCP, presentations: Dict, get_current_p
         enhance_charts: bool = True,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Unified professional design tool for themes, slides, and visual enhancements.
-        This applies professional styling and themes rather than structural layout changes."""
+        """Apply professional styling to the presentation. operation: "professional_slide" creates a styled slide; "theme" applies a color scheme to all slides; "enhance" improves existing elements (title, content, shapes, charts); "get_schemes" returns the list of available color scheme names."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if operation == "get_schemes":
@@ -132,7 +131,7 @@ def register_professional_tools(app: FastMCP, presentations: Dict, get_current_p
         effects: Dict[str, Dict],  # {"shadow": {"blur_radius": 4.0, ...}, "glow": {...}}
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Apply multiple picture effects in combination."""
+        """Apply visual effects to an image shape. Identify the image by slide_index and shape_index (0-based). effects is a dict keyed by effect name; supported effects: shadow, reflection, glow, soft_edges, rotation, transparency, bevel, filter."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -265,7 +264,7 @@ def register_professional_tools(app: FastMCP, presentations: Dict, get_current_p
         presentation_type: str = "business",
         text_content: Optional[str] = None
     ) -> Dict:
-        """Unified font management tool for analysis, optimization, and recommendations."""
+        """Analyze or optimize fonts in a presentation file. font_path must be a server-side .pptx path — users cannot upload files. operation: "analyze" reports fonts used; "optimize" embeds/substitutes fonts; "recommend" suggests fonts for the given presentation_type. presentation_type: "business", "academic", "creative"."""
         try:
             if operation == "analyze":
                 # Analyze font file

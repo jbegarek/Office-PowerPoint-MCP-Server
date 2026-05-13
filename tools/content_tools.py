@@ -28,7 +28,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         color_scheme: str = "modern_blue",
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add a new slide to the presentation with optional background styling."""
+        """Add a blank slide. background_type: "solid", "gradient", or "professional_gradient". background_colors: [[R,G,B]] for solid or [[R,G,B],[R,G,B]] for gradient. For slides with structured content, prefer create_slide_from_template instead."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -226,7 +226,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         text: str,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Populate a placeholder with text."""
+        """Fill a layout placeholder (title, content, subtitle) with text. placeholder_idx is the placeholder's index within the slide layout — use get_slide_info to see available placeholders. For text outside layout placeholders, use manage_text instead."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -264,7 +264,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         bullet_points: List[str],
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add bullet points to a placeholder."""
+        """Add a list of bullet points to a layout placeholder. placeholder_idx is the placeholder's index within the slide layout — use get_slide_info to see available placeholders. For free-floating bullet text, use manage_text instead."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -324,7 +324,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         max_font_size: int = 72,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Unified text management tool for adding, formatting, validating text, and formatting multiple text runs."""
+        """Add or format text on a slide. operation: "add" creates a new free-floating text box at (left, top) in inches; "format" applies font/color/alignment to an existing shape by shape_index; "validate" checks if text fits; "format_runs" applies formatting to specific text runs. color and bg_color are [R,G,B] lists. alignment: "left", "center", "right", "justify"."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -528,7 +528,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         output_path: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Unified image management tool for adding and enhancing images."""
+        """Add or enhance an image on a slide. operation: "add" inserts an image; "enhance" applies visual adjustments. source_type must be "base64" with image_source as a base64-encoded string — "file" source_type requires a server-side path and is not user-uploadable. Position (left, top) and size (width, height) are in inches."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:

@@ -23,19 +23,7 @@ def register_chart_tools(app, presentations, get_current_presentation_id, valida
         series_data: List[Dict],
         presentation_id: str = None
     ) -> Dict:
-        """
-        Replace existing chart data with new categories and series.
-        
-        Args:
-            slide_index: Index of the slide (0-based)
-            shape_index: Index of the chart shape (0-based)
-            categories: List of category names
-            series_data: List of dictionaries with 'name' and 'values' keys
-            presentation_id: Optional presentation ID (uses current if not provided)
-            
-        Returns:
-            Dictionary with operation results
-        """
+        """Replace the data in an existing chart. Identify the chart by slide_index and shape_index (both 0-based). series_data is a list of objects with "name" (string) and "values" (list of numbers) keys."""
         try:
             # Get presentation
             pres_id = presentation_id or get_current_presentation_id()

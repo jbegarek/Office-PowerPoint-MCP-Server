@@ -33,7 +33,7 @@ def register_structural_tools(app: FastMCP, presentations: Dict, get_current_pre
         border_color: Optional[List[int]] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add a table to a slide with enhanced formatting options."""
+        """Add a table to a slide. Position (left, top) and size (width, height) are in inches. data is a 2-D list of strings to pre-fill cells. header_bg_color, body_bg_color, border_color are [R,G,B] lists."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -148,7 +148,7 @@ def register_structural_tools(app: FastMCP, presentations: Dict, get_current_pre
         vertical_alignment: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Format a specific table cell."""
+        """Apply formatting to a single table cell. Identify by slide_index, shape_index (the table's shape), row, and col — all 0-based. color and bg_color are [R,G,B] lists. alignment: "left", "center", "right"."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -232,7 +232,7 @@ def register_structural_tools(app: FastMCP, presentations: Dict, get_current_pre
         font_color: Optional[List[int]] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add an auto shape to a slide with enhanced options."""
+        """Add a shape to a slide. shape_type values: rectangle, rounded_rectangle, oval, diamond, triangle, right_triangle, pentagon, hexagon, star, arrow, cloud, heart, lightning_bolt, sun, moon, smiley_face, flowchart_process, flowchart_decision, flowchart_data, flowchart_document. Position and size in inches. fill_color, line_color, font_color are [R,G,B] lists."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -309,7 +309,7 @@ def register_structural_tools(app: FastMCP, presentations: Dict, get_current_pre
         color_scheme: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add a chart to a slide with comprehensive formatting options."""
+        """Add a chart to a slide. chart_type values: column, stacked_column, bar, stacked_bar, line, line_markers, pie, doughnut, area, stacked_area, scatter, radar, radar_markers. series_values is a list of value lists, one per series. Position and size in inches. legend_position: "right", "left", "top", "bottom"."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:

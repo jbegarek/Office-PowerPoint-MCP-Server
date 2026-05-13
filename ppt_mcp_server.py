@@ -11,6 +11,12 @@ from typing import Dict, Any
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
+from utils.http_auth import (
+    APIKeyMiddleware,
+    build_download_url,
+    get_api_key,
+    get_api_key_header_name,
+)
 
 # import utils  # Currently unused
 from tools import (
@@ -32,7 +38,56 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Initialize the FastMCP server
 app = FastMCP(
-    name="ppt-mcp-server"
+    name="ppt-mcp-server",
+    instructions="""
+You are connected to a PowerPoint presentation server.
+
+WORKFLOW
+1. Call create_presentation to start a new presentation (or create_presentation_from_templates for a full deck at once).
+2. Add slides with add_slide or create_slide_from_template.
+3. Add content to each slide: manage_text for text boxes, populate_placeholder / add_bullet_points for layout placeholders, add_table, add_chart, add_shape.
+4. Optionally style with apply_professional_design or optimize_slide_text.
+5. Call save_presentation as the final step — return the download_url from its response to the user.
+
+FILE UPLOADS NOT SUPPORTED
+- This server cannot receive uploaded files from the user. Do not ask the user to upload any file (image, template, font, etc.).
+- manage_image requires source_type="base64" with a base64-encoded string — file paths are not accessible to the user.
+- If a task requires uploading a file, tell the user: "This MCP server cannot accept file uploads."
+
+CONVENTIONS
+- All slide, shape, row, and column indices are 0-based (first = 0).
+- Positions (left, top, width, height) are in inches.
+- Colors are RGB lists: [R, G, B] where each value is 0–255. Example: [255, 0, 0] for red.
+- presentation_id can almost always be omitted — the server remembers the current presentation.
+- Available color_scheme values: "modern_blue", "corporate_gray", "elegant_green", "warm_red".
+
+SAVING
+- save_presentation must be called explicitly to write to disk and get a download link.
+- Always call save_presentation last and return the download_url to the user.
+
+TEXT TOOLS — WHEN TO USE WHICH
+- populate_placeholder: fill a title/content/subtitle slot that exists in the slide's layout.
+- add_bullet_points: fill a placeholder with a list of bullet items.
+- manage_text (operation="add"): add a free-floating text box anywhere on the slide — use when you need text outside of layout placeholders.
+- manage_text (operation="format"): change font, size, color, alignment on an existing shape.
+
+TEMPLATE TOOLS — WHEN TO USE WHICH
+- list_slide_templates: see all available built-in layout templates and their IDs.
+- create_slide_from_template: PREFERRED — creates a new slide using a built-in template by ID.
+- apply_slide_template: apply a built-in template to an already-existing slide.
+- create_presentation_from_templates: create an entire presentation from a sequence of template IDs in one call.
+
+TOOL CATEGORIES
+- Presentation lifecycle:  create_presentation, save_presentation, list_presentations, switch_presentation, get_presentation_info, set_core_properties
+- Add slides:              add_slide, create_slide_from_template, create_presentation_from_templates
+- Text content:            manage_text, populate_placeholder, add_bullet_points
+- Structural elements:     add_table, add_chart, add_shape, add_connector, format_table_cell, update_chart_data
+- Images:                  manage_image (base64 only)
+- Design & styling:        apply_professional_design, apply_picture_effects, optimize_slide_text
+- Templates:               list_slide_templates, get_template_info, apply_slide_template, create_slide_from_template, create_presentation_from_templates
+- Hyperlinks:              manage_hyperlinks
+- Inspection:              get_slide_info, extract_slide_text, extract_presentation_text, manage_slide_masters
+""",
 )
 
 
@@ -63,7 +118,49 @@ def get_base_url() -> str:
 
 def get_download_url(filename: str) -> str:
     """Return a full download URL for a saved file."""
-    return f"{get_base_url()}/files/{filename}"
+    safe_filename = Path(filename).name
+    configured_base_url = os.environ.get("DOC_DOWNLOAD_BASE_URL", os.environ.get("MCP_DOWNLOAD_BASE_URL"))
+    if configured_base_url:
+        return build_download_url(configured_base_url, safe_filename)
+    return build_download_url(f"{get_base_url()}/files", safe_filename)
+
+
+def _build_streamable_http_app():
+    """Build a streamable-http ASGI app across FastMCP versions."""
+    if hasattr(app, "http_app"):
+        try:
+            return app.http_app(transport="streamable-http")
+        except TypeError:
+            return app.http_app()
+
+    if hasattr(app, "streamable_http_app"):
+        try:
+            return app.streamable_http_app()
+        except TypeError:
+            return app.streamable_http_app(path="/mcp")
+
+    raise RuntimeError("FastMCP version does not expose streamable HTTP app builder.")
+
+
+def _build_sse_app():
+    """Build an SSE ASGI app across FastMCP versions."""
+    if hasattr(app, "http_app"):
+        try:
+            return app.http_app(transport="sse")
+        except TypeError:
+            pass
+
+    if hasattr(app, "sse_app"):
+        sse_path = getattr(getattr(app, "settings", None), "sse_path", "/sse")
+        try:
+            return app.sse_app(path=sse_path)
+        except TypeError:
+            try:
+                return app.sse_app()
+            except TypeError:
+                pass
+
+    raise RuntimeError("FastMCP version does not expose SSE app builder.")
 
 # Template configuration
 def get_template_search_directories():
@@ -484,8 +581,47 @@ def main(transport: str = "stdio"):
         if private_domain:
             allowed_hosts.append(private_domain)
         app.settings.transport_security.allowed_hosts = allowed_hosts
-        transport_name = "streamable-http" if transport == "http" else "sse"
-        app.run(transport=transport_name)
+
+        if transport == "http":
+            api_key = get_api_key()
+            if api_key:
+                import uvicorn
+
+                api_key_header = get_api_key_header_name()
+                asgi_app = _build_streamable_http_app()
+                asgi_app.add_middleware(
+                    APIKeyMiddleware,
+                    api_key=api_key,
+                    header_name=api_key_header,
+                    exempt_paths=["/health", "/healthz"],
+                )
+                print(f"API key auth enabled for streamable-http via header '{api_key_header}'")
+                uvicorn.run(asgi_app, host=app.settings.host, port=app.settings.port)
+            else:
+                app.run(transport="streamable-http")
+        else:
+            api_key = get_api_key()
+            if api_key:
+                import uvicorn
+
+                api_key_header = get_api_key_header_name()
+                try:
+                    asgi_app = _build_sse_app()
+                except RuntimeError as exc:
+                    raise RuntimeError(
+                        "SSE transport with PPTX_MCP_API_KEY requires ASGI SSE app builder support in FastMCP."
+                    ) from exc
+
+                asgi_app.add_middleware(
+                    APIKeyMiddleware,
+                    api_key=api_key,
+                    header_name=api_key_header,
+                    exempt_paths=["/health", "/healthz"],
+                )
+                print(f"API key auth enabled for sse via header '{api_key_header}'")
+                uvicorn.run(asgi_app, host=app.settings.host, port=app.settings.port)
+            else:
+                app.run(transport="sse")
     else:
         app.run(transport='stdio')
         
