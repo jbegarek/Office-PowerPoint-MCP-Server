@@ -503,11 +503,12 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
                 "error": f"Failed to {operation} text: {str(e)}"
             }
 
-    @app.tool(
-        annotations=ToolAnnotations(
-            title="Manage Image",
-        ),
-    )
+    # manage_image is disabled — file uploads to this server are not supported
+    # @app.tool(
+    #     annotations=ToolAnnotations(
+    #         title="Manage Image",
+    #     ),
+    # )
     def manage_image(
         slide_index: int,
         operation: str,  # "add", "enhance"

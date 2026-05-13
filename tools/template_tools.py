@@ -100,7 +100,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         layout_index: int = 1,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """PREFERRED: Create a new slide using a built-in layout template. Call list_slide_templates first to see valid template_id values. content_mapping maps element roles (e.g. "title", "content") to text. image_paths is not supported — file uploads are not available."""
+        """PREFERRED: Create a new slide using a built-in layout template. Call list_slide_templates first to see valid template_id values. content_mapping maps element roles (e.g. "title", "content") to text. image_paths is not supported. When all slides are done, call save_presentation and return the download_url to the user."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -155,7 +155,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
         presentation_title: Optional[str] = None,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Create a full presentation from a sequence of template slides in one call. template_sequence is a list of objects, each with "template_id" and "content" keys (content maps role names like "title" / "content" to text). Call list_slide_templates first to see valid template IDs. image_paths inside templates are not supported — file uploads are not available."""
+        """Create a full presentation from a sequence of template slides in one call. template_sequence is a list of objects, each with "template_id" and "content" keys (content maps role names like "title" / "content" to text). Call list_slide_templates first to see valid template IDs. image_paths inside templates are not supported. After creation, call save_presentation and return the download_url to the user."""
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:

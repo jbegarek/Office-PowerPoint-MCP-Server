@@ -26,7 +26,7 @@ def register_presentation_tools(
         ),
     )
     def create_presentation(id: Optional[str] = None) -> Dict:
-        """Create a new PowerPoint presentation."""
+        """Create a new PowerPoint presentation. After all slides and content are complete, call save_presentation and return the download_url to the user."""
         # Create a new presentation
         pres = ppt_utils.create_presentation()
         

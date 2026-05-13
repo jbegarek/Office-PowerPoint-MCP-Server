@@ -49,10 +49,11 @@ WORKFLOW
 4. Optionally style with apply_professional_design or optimize_slide_text.
 5. Call save_presentation as the final step — return the download_url from its response to the user.
 
-FILE UPLOADS NOT SUPPORTED
-- This server cannot receive uploaded files from the user. Do not ask the user to upload any file (image, template, font, etc.).
-- manage_image requires source_type="base64" with a base64-encoded string — file paths are not accessible to the user.
-- If a task requires uploading a file, tell the user: "This MCP server cannot accept file uploads."
+FILE UPLOADS AND IMAGES — NOT SUPPORTED
+- This server cannot receive any uploaded files. There is NO image tool available.
+- Do NOT ask the user to upload images, templates, or any other files.
+- Do NOT suggest adding images to slides — it is not possible.
+- If the user asks to add an image or upload a file, tell them clearly: "This server cannot accept file uploads or add images."
 
 CONVENTIONS
 - All slide, shape, row, and column indices are 0-based (first = 0).
@@ -82,8 +83,7 @@ TOOL CATEGORIES
 - Add slides:              add_slide, create_slide_from_template, create_presentation_from_templates
 - Text content:            manage_text, populate_placeholder, add_bullet_points
 - Structural elements:     add_table, add_chart, add_shape, add_connector, format_table_cell, update_chart_data
-- Images:                  manage_image (base64 only)
-- Design & styling:        apply_professional_design, apply_picture_effects, optimize_slide_text
+- Design & styling:        apply_professional_design, optimize_slide_text
 - Templates:               list_slide_templates, get_template_info, apply_slide_template, create_slide_from_template, create_presentation_from_templates
 - Hyperlinks:              manage_hyperlinks
 - Inspection:              get_slide_info, extract_slide_text, extract_presentation_text, manage_slide_masters
