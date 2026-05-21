@@ -22,9 +22,7 @@ A comprehensive MCP (Model Context Protocol) server for PowerPoint manipulation 
 
 <img width="1640" alt="084f1cf4bc7e4fcd4890c8f94f536c1" src="https://github.com/user-attachments/assets/420e63a0-15a4-46d8-b149-1408d23af038" />
 
-#### Demo's GIF -> (./public/demo.mp4)
 
-![demo](./public/demo.gif)
 
 ## Features
 
@@ -248,8 +246,13 @@ The server provides **34 specialized tools** organized into the following catego
 ### **Structural Elements (4 tools)**
 23. **add_table** - Create tables with enhanced formatting
 24. **format_table_cell** - Format individual table cells
-25. **add_shape** - Add shapes with text and formatting options
-26. **add_chart** - Create charts with comprehensive customization
+25. **edit_table_cell** - Edit the text and formatting of a specific table cell
+26. **add_table_row** - Add a new row to an existing table (at any position)
+27. **delete_table_row** - Delete a row from an existing table
+28. **add_table_column** - Add a new column to an existing table (at any position)
+29. **delete_table_column** - Delete a column from an existing table
+30. **add_shape** - Add shapes with text and formatting options
+31. **add_chart** - Create charts with comprehensive customization
 
 ### **Professional Design (3 tools)**
 27. **apply_professional_design** - ✨ **Unified design tool** (themes/slides/enhancement)
@@ -272,6 +275,18 @@ manage_text(slide_index=0, operation="add", text="Hello World", font_size=24)
 
 # Format existing text
 manage_text(slide_index=0, operation="format", shape_index=0, bold=True, color=[255,0,0])
+
+# Update existing text (formatting only applied if fields are provided)
+manage_text(
+    slide_index=0,
+    operation="update",
+    shape_index=0,
+    text="Updated Title",
+    font_name="Segoe UI",
+    font_size=28,
+    bold=True,
+    alignment="center"
+)
 
 # Validate text fit with auto-fix
 manage_text(slide_index=0, operation="validate", shape_index=0, validation_only=False)
@@ -708,6 +723,29 @@ result = use_mcp_tool(
                 "shape_index": 1,
                 "shape_name": "Subtitle Placeholder 2",
                 "text": "Q4 2024 Results",
+                "formatting": {
+                    "word_wrap": true,
+                    "vertical_alignment": "middle",
+                    "paragraphs": [
+                        {
+                            "index": 0,
+                            "alignment": "center",
+                            "runs": [
+                                {
+                                    "index": 0,
+                                    "text": "Q4 2024 Results",
+                                    "font_name": "Segoe UI",
+                                    "font_size": 24,
+                                    "bold": true,
+                                    "italic": null,
+                                    "underline": null,
+                                    "color": [0, 0, 0],
+                                    "bg_color": null
+                                }
+                            ]
+                        }
+                    ]
+                },
                 "placeholder_type": "SUBTITLE",
                 "placeholder_idx": 1
             }
@@ -716,10 +754,34 @@ result = use_mcp_tool(
             {
                 "shape_index": 3,
                 "shape_name": "TextBox 4",
-                "text": "Revenue increased by 15%"
+                "text": "Revenue increased by 15%",
+                "formatting": {
+                    "word_wrap": true,
+                    "vertical_alignment": "top",
+                    "paragraphs": [
+                        {
+                            "index": 0,
+                            "alignment": "left",
+                            "runs": [
+                                {
+                                    "index": 0,
+                                    "text": "Revenue increased by 15%",
+                                    "font_name": "Segoe UI",
+                                    "font_size": 18,
+                                    "bold": null,
+                                    "italic": null,
+                                    "underline": null,
+                                    "color": [34, 34, 34],
+                                    "bg_color": null
+                                }
+                            ]
+                        }
+                    ]
+                }
             }
         ],
         "table_text": [],
+        "table_cells": [],
         "all_text_combined": "Quarterly Business Review\nQ4 2024 Results\nRevenue increased by 15%"
     },
     "total_text_shapes": 2,
@@ -896,7 +958,7 @@ Templates automatically adjust to content:
 Office-PowerPoint-MCP-Server/
 ├── ppt_mcp_server.py          # Main consolidated server (v2.0)
 ├── slide_layout_templates.json # 25+ professional slide templates with dynamic features
-├── tools/                     # 11 specialized tool modules (32 tools total)
+├── tools/                     # 11 specialized tool modules (37 tools total)
 │   ├── __init__.py
 │   ├── presentation_tools.py  # Presentation management (7 tools)
 │   ├── content_tools.py       # Content & slides (6 tools)
@@ -977,6 +1039,7 @@ Office-PowerPoint-MCP-Server/
 ### **Key Features of Text Extraction:**
 - **Complete text coverage** - Extracts from titles, placeholders, text boxes, and table cells
 - **Structured output** - Organized by content type (titles, placeholders, shapes, tables)
+- **Formatting details** - Exposes per-paragraph alignment and per-run font properties
 - **Presentation-wide analysis** - Statistics on text distribution across slides
 - **Flexible output options** - Individual slide content or combined presentation text
 - **Error handling** - Graceful handling of slides that cannot be processed

@@ -3,6 +3,7 @@ Content management tools for PowerPoint MCP Server.
 Handles slides, text, images, and content manipulation.
 """
 from typing import Dict, List, Optional, Any, Union
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 import utils as ppt_utils
@@ -299,7 +300,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
     )
     def manage_text(
         slide_index: int,
-        operation: str,  # "add", "format", "validate", "format_runs"
+        operation: str,  # "add", "format", "update", "validate", "format_runs"
         left: float = 1.0,
         top: float = 1.0,
         width: float = 4.0,
@@ -324,7 +325,19 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
         max_font_size: int = 72,
         presentation_id: Optional[str] = None
     ) -> Dict:
-        """Add or format text on a slide. operation: "add" creates a new free-floating text box at (left, top) in inches; "format" applies font/color/alignment to an existing shape by shape_index; "validate" checks if text fits; "format_runs" applies formatting to specific text runs. color and bg_color are [R,G,B] lists. alignment: "left", "center", "right", "justify"."""
+        """
+        Unified text management tool.
+
+        Operations:
+        - add: create a new free-floating text box at (left, top) in inches; optionally apply formatting.
+        - format: apply font/color/alignment to an existing text shape by shape_index without changing its text.
+        - update: replace an existing text shape's text. If you do not pass formatting fields,
+            the existing formatting will be preserved.
+        - validate: check if text fits the shape and optionally auto-fix.
+        - format_runs: rebuild text as multiple runs with per-run formatting.
+
+        color and bg_color are [R,G,B] lists. alignment: "left", "center", "right", "justify".
+        """
         pres_id = presentation_id if presentation_id is not None else get_current_presentation_id()
         
         if pres_id is None or pres_id not in presentations:
@@ -385,8 +398,11 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
                     }
                 
                 shape = slide.shapes[shape_index]
+                if not hasattr(shape, 'text_frame') or not shape.text_frame:
+                    return {"error": "Shape does not contain text"}
+
                 ppt_utils.format_text_advanced(
-                    shape,
+                    shape.text_frame,
                     font_size=font_size,
                     font_name=font_name,
                     bold=bold,
@@ -399,6 +415,138 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
                 )
                 return {
                     "message": f"Formatted text shape {shape_index} on slide {slide_index}"
+                }
+
+            elif operation == "update":
+                # Update existing text shape content (optionally with formatting)
+                if shape_index is None or shape_index < 0 or shape_index >= len(slide.shapes):
+                    return {
+                        "error": f"Invalid shape index for update: {shape_index}. Available shapes: 0-{len(slide.shapes) - 1}"
+                    }
+
+                shape = slide.shapes[shape_index]
+                if not hasattr(shape, 'text_frame') or not shape.text_frame:
+                    return {"error": "Shape does not contain text"}
+
+                text_frame = shape.text_frame
+
+                preserve_formatting = not any([
+                    font_size, font_name, bold, italic, underline, color,
+                    bg_color, alignment, vertical_alignment
+                ])
+
+                inherited_formatting = {}
+                word_wrap = getattr(text_frame, 'word_wrap', None)
+
+                if preserve_formatting:
+                    paragraph = text_frame.paragraphs[0] if text_frame.paragraphs else None
+                    run = paragraph.runs[0] if paragraph and paragraph.runs else None
+
+                    if paragraph:
+                        alignment_map = {
+                            PP_ALIGN.LEFT: 'left',
+                            PP_ALIGN.CENTER: 'center',
+                            PP_ALIGN.RIGHT: 'right',
+                            PP_ALIGN.JUSTIFY: 'justify'
+                        }
+
+                        inherited_formatting["alignment"] = alignment_map.get(paragraph.alignment)
+
+                    if getattr(text_frame, 'vertical_anchor', None) is not None:
+                        vertical_alignment_map = {
+                            MSO_VERTICAL_ANCHOR.TOP: 'top',
+                            MSO_VERTICAL_ANCHOR.MIDDLE: 'middle',
+                            MSO_VERTICAL_ANCHOR.BOTTOM: 'bottom'
+                        }
+                        inherited_formatting["vertical_alignment"] = vertical_alignment_map.get(
+                            text_frame.vertical_anchor
+                        )
+
+                    if run and run.font is not None:
+                        font = run.font
+                        inherited_formatting["font_name"] = font.name
+                        inherited_formatting["bold"] = font.bold
+                        inherited_formatting["italic"] = font.italic
+                        inherited_formatting["underline"] = font.underline
+
+                        if font.size is not None:
+                            inherited_formatting["font_size"] = int(font.size.pt)
+
+                        if font.color is not None and getattr(font.color, 'rgb', None) is not None:
+                            inherited_formatting["color"] = [
+                                int(font.color.rgb[0]),
+                                int(font.color.rgb[1]),
+                                int(font.color.rgb[2])
+                            ]
+
+                        try:
+                            if font.highlight_color is not None and getattr(font.highlight_color, 'rgb', None) is not None:
+                                inherited_formatting["bg_color"] = [
+                                    int(font.highlight_color.rgb[0]),
+                                    int(font.highlight_color.rgb[1]),
+                                    int(font.highlight_color.rgb[2])
+                                ]
+                        except Exception:
+                            pass
+
+                # Safely replace text while preserving paragraph/run structure
+                # This avoids text box size changes that can occur with clear()
+                all_runs = []
+                for paragraph in text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        all_runs.append(run)
+
+                if all_runs:
+                    # Set first run to new text, clear others
+                    all_runs[0].text = text
+                    for run in all_runs[1:]:
+                        run.text = ""
+                else:
+                    # No runs exist, add one to first paragraph
+                    if text_frame.paragraphs:
+                        run = text_frame.paragraphs[0].add_run()
+                    else:
+                        paragraph = text_frame.add_paragraph()
+                        run = paragraph.add_run()
+                    run.text = text
+
+                if preserve_formatting:
+                    if inherited_formatting:
+                        ppt_utils.format_text_advanced(
+                            text_frame,
+                            font_size=inherited_formatting.get("font_size"),
+                            font_name=inherited_formatting.get("font_name"),
+                            bold=inherited_formatting.get("bold"),
+                            italic=inherited_formatting.get("italic"),
+                            underline=inherited_formatting.get("underline"),
+                            color=tuple(inherited_formatting.get("color"))
+                            if inherited_formatting.get("color") else None,
+                            bg_color=tuple(inherited_formatting.get("bg_color"))
+                            if inherited_formatting.get("bg_color") else None,
+                            alignment=inherited_formatting.get("alignment"),
+                            vertical_alignment=inherited_formatting.get("vertical_alignment")
+                        )
+
+                    if word_wrap is False:
+                        text_frame.word_wrap = False
+
+                else:
+                    ppt_utils.format_text_advanced(
+                        text_frame,
+                        font_size=font_size,
+                        font_name=font_name,
+                        bold=bold,
+                        italic=italic,
+                        underline=underline,
+                        color=tuple(color) if color else None,
+                        bg_color=tuple(bg_color) if bg_color else None,
+                        alignment=alignment,
+                        vertical_alignment=vertical_alignment
+                    )
+
+                return {
+                    "message": f"Updated text shape {shape_index} on slide {slide_index}",
+                    "text": text
                 }
             
             elif operation == "validate":
@@ -495,7 +643,7 @@ def register_content_tools(app: FastMCP, presentations: Dict, get_current_presen
             
             else:
                 return {
-                    "error": f"Invalid operation: {operation}. Must be 'add', 'format', 'validate', or 'format_runs'"
+                    "error": f"Invalid operation: {operation}. Must be 'add', 'format', 'update', 'validate', or 'format_runs'"
                 }
         
         except Exception as e:

@@ -5,8 +5,9 @@ Functions for slides, text, images, tables, charts, and shapes.
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.text import PP_ALIGN
-from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
+from pptx.oxml.ns import qn
+from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from typing import Dict, List, Tuple, Optional, Any
 import tempfile
@@ -42,6 +43,8 @@ def get_slide_info(slide, slide_index: int) -> Dict:
         Dictionary containing slide information
     """
     try:
+        from pptx.util import Inches, Emu
+
         placeholders = []
         for placeholder in slide.placeholders:
             placeholder_info = {
@@ -53,20 +56,51 @@ def get_slide_info(slide, slide_index: int) -> Dict:
         
         shapes = []
         for i, shape in enumerate(slide.shapes):
+            left_emu = shape.left
+            top_emu = shape.top
+            width_emu = shape.width
+            height_emu = shape.height
+
+            left_in = float(Inches(1).emu / left_emu) if left_emu else 0
+            top_in = float(Inches(1).emu / top_emu) if top_emu else 0
+            width_in = float(width_emu) / Inches(1).emu if width_emu else 0
+            height_in = float(height_emu) / Inches(1).emu if height_emu else 0
+
             shape_info = {
                 "index": i,
                 "name": shape.name,
                 "shape_type": str(shape.shape_type),
-                "left": shape.left,
-                "top": shape.top,
-                "width": shape.width,
-                "height": shape.height
+                "left": left_emu,
+                "top": top_emu,
+                "width": width_emu,
+                "height": height_emu,
+                "left_inches": round(left_in, 2),
+                "top_inches": round(top_in, 2),
+                "width_inches": round(width_in, 2),
+                "height_inches": round(height_in, 2),
+                "has_text": bool(hasattr(shape, 'text_frame') and shape.text_frame and shape.text_frame.text.strip()),
             }
             shapes.append(shape_info)
         
+        # Slide dimensions in inches (from presentation)
+        try:
+            pres = slide.part.package.presentation_part.presentation
+            slide_width_emu = pres.slide_width
+            slide_height_emu = pres.slide_height
+        except Exception:
+            slide_width_emu = None
+            slide_height_emu = None
+            
+        slide_width_in = float(slide_width_emu) / Inches(1).emu if slide_width_emu else 0
+        slide_height_in = float(slide_height_emu) / Inches(1).emu if slide_height_emu else 0
+
         return {
             "slide_index": slide_index,
             "layout_name": slide.slide_layout.name,
+            "slide_width": slide_width_emu,
+            "slide_height": slide_height_emu,
+            "slide_width_inches": round(slide_width_in, 2),
+            "slide_height_inches": round(slide_height_in, 2),
             "placeholder_count": len(placeholders),
             "placeholders": placeholders,
             "shape_count": len(shapes),
@@ -248,9 +282,18 @@ def format_text_advanced(text_frame, font_size: int = None, font_name: str = Non
             'right': PP_ALIGN.RIGHT,
             'justify': PP_ALIGN.JUSTIFY
         }
+
+        vertical_alignment_map = {
+            'top': MSO_VERTICAL_ANCHOR.TOP,
+            'middle': MSO_VERTICAL_ANCHOR.MIDDLE,
+            'bottom': MSO_VERTICAL_ANCHOR.BOTTOM
+        }
         
         # Enable text wrapping
         text_frame.word_wrap = True
+
+        if vertical_alignment and vertical_alignment in vertical_alignment_map:
+            text_frame.vertical_anchor = vertical_alignment_map[vertical_alignment]
         
         # Apply formatting to all paragraphs and runs
         for paragraph in text_frame.paragraphs:
@@ -273,6 +316,12 @@ def format_text_advanced(text_frame, font_size: int = None, font_name: str = Non
                 if color is not None:
                     r, g, b = color
                     font.color.rgb = RGBColor(r, g, b)
+                if bg_color is not None:
+                    try:
+                        r, g, b = bg_color
+                        font.highlight_color.rgb = RGBColor(r, g, b)
+                    except Exception:
+                        pass
         
         return result
         
@@ -473,6 +522,124 @@ def format_chart(chart, has_legend: bool = True, legend_position: str = 'right',
         pass  # Graceful degradation for chart formatting
 
 
+def _alignment_to_string(alignment) -> Optional[str]:
+    if alignment is None:
+        return None
+
+    alignment_map = {
+        PP_ALIGN.LEFT: 'left',
+        PP_ALIGN.CENTER: 'center',
+        PP_ALIGN.RIGHT: 'right',
+        PP_ALIGN.JUSTIFY: 'justify'
+    }
+
+    return alignment_map.get(alignment, str(alignment))
+
+
+def _vertical_anchor_to_string(anchor) -> Optional[str]:
+    if anchor is None:
+        return None
+
+    anchor_map = {
+        MSO_VERTICAL_ANCHOR.TOP: 'top',
+        MSO_VERTICAL_ANCHOR.MIDDLE: 'middle',
+        MSO_VERTICAL_ANCHOR.BOTTOM: 'bottom'
+    }
+
+    return anchor_map.get(anchor, str(anchor))
+
+
+def _rgb_to_list(rgb) -> Optional[List[int]]:
+    if rgb is None:
+        return None
+
+    try:
+        return [int(rgb[0]), int(rgb[1]), int(rgb[2])]
+    except Exception:
+        return None
+
+
+def _safe_get_highlight_color(font) -> Optional[List[int]]:
+    try:
+        highlight = font.highlight_color
+    except Exception:
+        return None
+    if highlight is None:
+        return None
+
+    try:
+        return _rgb_to_list(highlight.rgb)
+    except Exception:
+        return None
+
+
+def _is_placeholder(shape) -> bool:
+    try:
+        _ = shape.placeholder_format
+        return True
+    except Exception:
+        return False
+
+
+def _extract_text_frame_formatting(text_frame) -> Dict:
+    formatting = {
+        "word_wrap": getattr(text_frame, 'word_wrap', None),
+        "vertical_alignment": _vertical_anchor_to_string(getattr(text_frame, 'vertical_anchor', None)),
+        "paragraphs": []
+    }
+
+    try:
+        paragraphs = list(text_frame.paragraphs)
+    except Exception:
+        return formatting
+
+    for paragraph_index, paragraph in enumerate(paragraphs):
+        paragraph_info = {
+            "index": paragraph_index,
+            "alignment": _alignment_to_string(getattr(paragraph, 'alignment', None)),
+            "runs": []
+        }
+
+        try:
+            runs = list(paragraph.runs)
+        except Exception:
+            runs = []
+
+        for run_index, run in enumerate(runs):
+            font = getattr(run, 'font', None)
+            font_size = None
+            if font is not None and getattr(font, 'size', None) is not None:
+                try:
+                    font_size = int(font.size.pt)
+                except Exception:
+                    font_size = None
+
+            color = None
+            if font is not None and getattr(font, 'color', None) is not None:
+                try:
+                    color = _rgb_to_list(font.color.rgb)
+                except Exception:
+                    color = None
+
+            bg_color = _safe_get_highlight_color(font) if font is not None else None
+
+            paragraph_info["runs"].append({
+                "index": run_index,
+                "text": getattr(run, 'text', ''),
+                "font_name": font.name if font is not None else None,
+                "font_size": font_size,
+                "bold": font.bold if font is not None else None,
+                "italic": font.italic if font is not None else None,
+                "underline": font.underline if font is not None else None,
+                "color": color,
+                "bg_color": bg_color
+            })
+
+        formatting["paragraphs"].append(paragraph_info)
+
+    return formatting
+
+
 def extract_slide_text_content(slide) -> Dict:
     """
     Extract all text content from a slide including placeholders and text shapes.
@@ -489,6 +656,7 @@ def extract_slide_text_content(slide) -> Dict:
             "placeholders": [],
             "text_shapes": [],
             "table_text": [],
+            "table_cells": [],
             "all_text_combined": ""
         }
         
@@ -518,11 +686,12 @@ def extract_slide_text_content(slide) -> Dict:
                 if hasattr(shape, 'text_frame') and shape.text_frame:
                     text = shape.text_frame.text.strip()
                     if text:
+                        shape_text_info["formatting"] = _extract_text_frame_formatting(shape.text_frame)
                         shape_text_info["text"] = text
                         all_texts.append(text)
                         
                         # Categorize by shape type
-                        if hasattr(shape, 'placeholder_format'):
+                        if _is_placeholder(shape):
                             # This is a placeholder
                             placeholder_info = shape_text_info.copy()
                             placeholder_info["placeholder_type"] = str(shape.placeholder_format.type)
@@ -535,6 +704,7 @@ def extract_slide_text_content(slide) -> Dict:
                 # Extract text from tables
                 elif hasattr(shape, 'table'):
                     table_texts = []
+                    table_cell_details = []
                     table = shape.table
                     for row_idx, row in enumerate(table.rows):
                         row_texts = []
@@ -543,6 +713,12 @@ def extract_slide_text_content(slide) -> Dict:
                             if cell_text:
                                 row_texts.append(cell_text)
                                 all_texts.append(cell_text)
+                                table_cell_details.append({
+                                    "row": row_idx,
+                                    "col": col_idx,
+                                    "text": cell_text,
+                                    "formatting": _extract_text_frame_formatting(cell.text_frame)
+                                })
                         if row_texts:
                             table_texts.append({
                                 "row": row_idx,
@@ -554,6 +730,13 @@ def extract_slide_text_content(slide) -> Dict:
                             "shape_index": i,
                             "shape_name": shape.name,
                             "table_content": table_texts
+                        })
+
+                    if table_cell_details:
+                        text_content["table_cells"].append({
+                            "shape_index": i,
+                            "shape_name": shape.name,
+                            "cells": table_cell_details
                         })
                         
             except Exception as e:
@@ -577,3 +760,295 @@ def extract_slide_text_content(slide) -> Dict:
             "error": f"Failed to extract text content: {str(e)}",
             "text_content": None
         }
+
+
+# ============================================================
+# Table Row/Column Manipulation
+# ============================================================
+
+def _safe_cell_formatting(cell) -> Dict:
+    """
+    Safely capture the current formatting of a table cell.
+
+    Returns a dict with all preserved formatting values, or None for unset.
+    """
+    fmt = {}
+    tf = cell.text_frame
+
+    # Paragraph alignment
+    p = tf.paragraphs[0] if tf.paragraphs else None
+    fmt["alignment"] = p.alignment if p else None
+
+    # Run-level font properties (from the first run)
+    run = p.runs[0] if (p and p.runs) else None
+    if run:
+        font = run.font
+        fmt["bold"] = font.bold
+        fmt["italic"] = font.italic
+        fmt["underline"] = font.underline
+        fmt["font_size"] = font.size
+        fmt["font_name"] = font.name
+        fmt["font_color"] = font.color.rgb if font.color.type is not None else None
+    else:
+        fmt["bold"] = None
+        fmt["italic"] = None
+        fmt["underline"] = None
+        fmt["font_size"] = None
+        fmt["font_name"] = None
+        fmt["font_color"] = None
+
+    # Vertical alignment
+    fmt["vertical_alignment"] = getattr(tf, "vertical_anchor", None)
+
+    # Background fill
+    fmt["bg_color"] = cell.fill.fore_color.rgb if cell.fill.type is not None else None
+
+    return fmt
+
+
+def _apply_cell_formatting(cell, fmt: Dict) -> None:
+    """
+    Apply a saved formatting dict back to a table cell.
+    Only re-applies values that are not None.
+
+    Works directly on the cell XML rather than going through format_table_cell,
+    because format_table_cell expects int-point sizes and tuple-RGB colors,
+    while font.size returns Centipoints and font.color.rgb returns RGBColor.
+    """
+    p = cell.text_frame.paragraphs[0] if cell.text_frame.paragraphs else None
+    if p is None:
+        return
+
+    # Re-apply paragraph alignment
+    if fmt.get("alignment") is not None:
+        p.alignment = fmt["alignment"]
+
+    # Re-apply run-level formatting
+    for run in p.runs:
+        font = run.font
+
+        if fmt.get("font_size") is not None:
+            font.size = fmt["font_size"]  # Centipoints object, assign directly
+        if fmt.get("font_name") is not None:
+            font.name = fmt["font_name"]
+        if fmt.get("bold") is not None:
+            font.bold = fmt["bold"]
+        if fmt.get("italic") is not None:
+            font.italic = fmt["italic"]
+        if fmt.get("underline") is not None:
+            font.underline = fmt["underline"]
+        if fmt.get("font_color") is not None:
+            font.color.rgb = fmt["font_color"]  # RGBColor object
+
+    # Background fill
+    if fmt.get("bg_color") is not None:
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = fmt["bg_color"]
+
+    # Vertical alignment
+    if fmt.get("vertical_alignment") is not None:
+        cell.text_frame.vertical_anchor = fmt["vertical_alignment"]
+
+
+def edit_cell_text(cell, text: str = None, font_size: int = None, font_name: str = None,
+                   bold: bool = None, italic: bool = None,
+                   color: Tuple[int, int, int] = None, bg_color: Tuple[int, int, int] = None,
+                   alignment: str = None, vertical_alignment: str = None) -> None:
+    """
+    Edit a table cell's text while preserving its existing formatting.
+
+    Only the explicitly provided formatting parameters override the existing ones.
+
+    Args:
+        cell: The table cell object
+        text: New text content for the cell (None to keep existing)
+        font_size: Font size in points
+        font_name: Font name
+        bold: Whether text should be bold
+        italic: Whether text should be italic
+        color: RGB color tuple (r, g, b)
+        bg_color: Background RGB color tuple (r, g, b)
+        alignment: Text alignment
+        vertical_alignment: Vertical alignment
+    """
+    if text is not None:
+        # Preserve current formatting before replacing text
+        saved_fmt = _safe_cell_formatting(cell)
+        cell.text = str(text)
+        _apply_cell_formatting(cell, saved_fmt)
+
+    # Now apply any user-provided formatting overrides
+    format_table_cell(
+        cell,
+        font_size=font_size,
+        font_name=font_name,
+        bold=bold,
+        italic=italic,
+        color=color,
+        bg_color=bg_color,
+        alignment=alignment,
+        vertical_alignment=vertical_alignment
+    )
+
+
+def _create_tc(parent_tbl, default_height_emu: int = 400000) -> Any:
+    """Create a new table cell XML element with an empty paragraph."""
+    tc = parent_tbl.makeelement(qn('a:tc'), {})
+    tc_pr = tc.makeelement(qn('a:tcPr'), {})
+    tc.append(tc_pr)
+    p = tc.makeelement(qn('a:p'), {})
+    r = p.makeelement(qn('a:r'), {})
+    rPr = r.makeelement(qn('a:rPr'), {})
+    r.append(rPr)
+    p.append(r)
+    tc.append(p)
+    return tc
+
+
+def _create_grid_col(default_width: str = "914400") -> Any:
+    """Create a new gridCol XML element."""
+    return _create_grid_col_with_width(int(default_width))
+
+
+def _create_grid_col_with_width(width_emu: int) -> Any:
+    """Create a new gridCol XML element with specified width."""
+    gc = _create_tc(None).makeelement(qn('a:gridCol'), {'w': str(width_emu)})
+    return gc
+
+
+def add_table_row(table, insert_at: int = None, data: Optional[List[str]] = None,
+                  height: Optional[float] = None) -> int:
+    """
+    Add a new row to a table.
+
+    Args:
+        table: The table object
+        insert_at: Row index to insert at (None = append at end)
+        data: Optional list of text values for the new row cells
+        height: Optional row height in inches (None = default)
+
+    Returns:
+        The index of the newly added row
+    """
+    tbl = table._tbl
+    num_cols = len(table.columns)
+    default_height_emu = int(height * 914400) if height else 400000
+
+    # Create new <a:tr> element
+    new_tr = tbl.makeelement(qn('a:tr'), {'h': str(default_height_emu)})
+
+    # Add cells matching the grid columns
+    for i in range(num_cols):
+        tc = _create_tc(tbl)
+        new_tr.append(tc)
+
+    # Insert at position or append
+    if insert_at is not None and insert_at < len(tbl.tr_lst):
+        existing_tr = tbl.tr_lst[insert_at]
+        tbl.insert(list(tbl.tr_lst).index(existing_tr), new_tr)
+        row_index = insert_at
+    else:
+        tbl.append(new_tr)
+        row_index = len(tbl.tr_lst) - 1
+
+    table.notify_height_changed()
+
+    # Populate data if provided
+    if data:
+        for i, value in enumerate(data):
+            if i < num_cols:
+                table.cell(row_index, i).text = str(value)
+
+    return row_index
+
+
+def delete_table_row(table, row_index: int) -> None:
+    """
+    Delete a row from a table by index.
+
+    Args:
+        table: The table object
+        row_index: Index of the row to delete
+    """
+    tbl = table._tbl
+    if row_index < 0 or row_index >= len(tbl.tr_lst):
+        raise ValueError(f"Invalid row index: {row_index}. Available rows: 0-{len(tbl.tr_lst) - 1}")
+
+    tr_to_remove = tbl.tr_lst[row_index]
+    tbl.remove(tr_to_remove)
+    table.notify_height_changed()
+
+
+def add_table_column(table, insert_at: int = None, data: Optional[List[str]] = None,
+                     width: Optional[float] = None) -> int:
+    """
+    Add a new column to a table.
+
+    Args:
+        table: The table object
+        insert_at: Column index to insert at (None = append at end)
+        data: Optional list of text values for the new column cells (one per row)
+        width: Optional column width in inches (None = auto)
+
+    Returns:
+        The index of the newly added column
+    """
+    tbl = table._tbl
+    num_rows = len(tbl.tr_lst)
+    default_width_emu = int(width * 914400) if width else 914400
+
+    # Create new <a:gridCol> element
+    new_gc = tbl.tblGrid.makeelement(qn('a:gridCol'), {'w': str(default_width_emu)})
+
+    # Insert at position or append
+    if insert_at is not None and insert_at < len(tbl.tblGrid.gridCol_lst):
+        existing_gc = list(tbl.tblGrid.gridCol_lst)[insert_at]
+        tbl.tblGrid.insert(list(tbl.tblGrid.gridCol_lst).index(existing_gc), new_gc)
+        col_index = insert_at
+    else:
+        tbl.tblGrid.append(new_gc)
+        col_index = len(list(tbl.tblGrid.gridCol_lst)) - 1
+
+    # Add a new <a:tc> to each existing row
+    for tr in tbl.tr_lst:
+        tc = _create_tc(tr)
+        if insert_at is not None and insert_at < len(tr.findall(qn('a:tc'))):
+            existing_tcs = tr.findall(qn('a:tc'))
+            tr.insert(list(existing_tcs).index(existing_tcs[insert_at]), tc)
+        else:
+            tr.append(tc)
+
+    table.notify_width_changed()
+
+    # Populate data if provided
+    if data:
+        for i, value in enumerate(data):
+            if i < num_rows:
+                table.cell(i, col_index).text = str(value)
+
+    return col_index
+
+
+def delete_table_column(table, col_index: int) -> None:
+    """
+    Delete a column from a table by index.
+
+    Args:
+        table: The table object
+        col_index: Index of the column to delete
+    """
+    tbl = table._tbl
+    grid_cols = list(tbl.tblGrid.gridCol_lst)
+    if col_index < 0 or col_index >= len(grid_cols):
+        raise ValueError(f"Invalid column index: {col_index}. Available columns: 0-{len(grid_cols) - 1}")
+
+    # Remove gridCol
+    tbl.tblGrid.remove(grid_cols[col_index])
+
+    # Remove corresponding tc from each row
+    for tr in tbl.tr_lst:
+        tcs = tr.findall(qn('a:tc'))
+        if col_index < len(tcs):
+            tr.remove(tcs[col_index])
+
+    table.notify_width_changed()
